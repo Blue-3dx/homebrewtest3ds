@@ -4,6 +4,7 @@ DEVKITARM ?= $(DEVKITPRO)/devkitARM
 
 CC      := $(DEVKITARM)/bin/arm-none-eabi-gcc
 AR      := $(DEVKITARM)/bin/arm-none-eabi-ar
+OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
 
 CFLAGS   := -O2 -Wall -fdata-sections -ffunction-sections
 CFLAGS  += -march=armv6k -mtune=mpcore -mfloat-abi=hard

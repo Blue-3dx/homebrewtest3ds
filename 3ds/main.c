@@ -1,8 +1,8 @@
 // 3ds/main.c
 // GDWave 3DS port (citro2d) - loads wave.t3x from romfs:/gfx/wave.t3x
-// NOTE: include <3ds.h> BEFORE <citro2d.h> so system types (u16, GPU_*, gfxScreen_t, etc.) are defined.
+// NOTE: include <3ds.h> BEFORE <citro2d.h>
 
-#include <3ds.h>       
+#include <3ds.h>       // must come first for system typedefs (u16, GPU_*, gfxScreen_t, etc.)
 #include <citro2d.h>
 #include <string.h>
 #include <math.h>

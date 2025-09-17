@@ -20,10 +20,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install devkitPro toolchain (3DS)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget https://apt.devkitpro.org/devkitpro-keyring.gpg -O- | sudo tee /usr/share/keyrings/devkitpro-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/devkitpro-keyring.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+          sudo apt-get update
+          sudo apt-get install -y devkitpro-pacman
+          sudo dkp-pacman -Syu --noconfirm
+          sudo dkp-pacman -S --noconfirm 3ds-dev
+        shell: bash
+
       - name: Install devkitPro packages (dkp-pacman)
         run: |
           set -e
-          # update package db and install libs headers + tools required for citro2d builds
           dkp-pacman -Syu --noconfirm
           dkp-pacman -S --noconfirm libctru citro2d citro3d tex3ds
 

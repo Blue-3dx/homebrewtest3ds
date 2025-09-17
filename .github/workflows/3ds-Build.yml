@@ -8,7 +8,7 @@ on:
 jobs:
   build-3DS:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     container:
       image: devkitpro/devkitarm:latest
 
@@ -18,6 +18,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install devkitPro packages (dkp-pacman)
+        run: |
+          set -e
+          # update package databases and install required runtime libs for building citro2d apps
+          # dkp-pacman is available in the official devkitpro images
+          dkp-pacman -Syu --noconfirm
+          dkp-pacman -S --noconfirm libctru citro2d tex3ds
 
       - name: Prepare icon if missing (use assets/wave.png)
         run: |
@@ -30,23 +38,28 @@ jobs:
             echo "Icon present or assets/wave.png missing; skipping copy"
           fi
 
-      - name: Show env + devkit listing (debug)
+      - name: Show devkitPro layout (debug)
         run: |
           echo "DEVKITPRO=$DEVKITPRO"
           echo "DEVKITARM=$DEVKITARM"
           ls -la $DEVKITPRO || true
-          ls -la $DEVKITARM || true
+          ls -la $DEVKITPRO/libctru || true
+          ls -la $DEVKITPRO/citro2d || true
 
-      - name: Build .3dsx (standalone make in 3ds/)
+      - name: Build .3dsx (3ds/)
         run: |
           set -e
           cd 3ds
           make clean || true
           make
-          ls -la
+          echo "Build finished. Listing possible outputs:"
+          find . -maxdepth 2 -type f -name '*.3dsx' -print -ls || true
 
       - name: Upload .3dsx artifact
         uses: actions/upload-artifact@v4
         with:
           name: GDWave-3dsx
-          path: 3ds/GDWave3DS.3dsx
+          path: |
+            3ds/GDWave3DS.3dsx
+            GDWave3DS.3dsx
+            **/*.3dsx

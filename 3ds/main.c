@@ -1,7 +1,9 @@
 // 3ds/main.c
 // GDWave 3DS port (citro2d) - loads wave.t3x from romfs:/gfx/wave.t3x
+// NOTE: include <3ds.h> BEFORE <citro2d.h> so system types (u16, GPU_*, gfxScreen_t, etc.) are defined.
+
+#include <3ds.h>       
 #include <citro2d.h>
-#include <3ds.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -29,7 +31,6 @@ int main(int argc, char* argv[]) {
         consoleInit(GFX_BOTTOM, NULL);
         printf("Failed to load romfs:/gfx/wave.t3x\n");
         printf("Make sure the file exists in romfs/gfx and is a valid .t3x produced for citro2d.\n");
-        // wait for Start to exit
         while (aptMainLoop()) {
             hidScanInput();
             if (hidKeysDown() & KEY_START) break;

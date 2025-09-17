@@ -1,36 +1,129 @@
-# 3ds/Makefile — manual build for GDWave3DS (produces GDWave3DS.3dsx)
-DEVKITPRO ?= /opt/devkitpro
-DEVKITARM ?= $(DEVKITPRO)/devkitARM
+# Top-level Makefile (patched for CI: use DEVKITPRO path for rules)
+#---------------------------------------------------------------------------------
+.SUFFIXES:
+#---------------------------------------------------------------------------------
 
-CC      := $(DEVKITARM)/bin/arm-none-eabi-gcc
-AR      := $(DEVKITARM)/bin/arm-none-eabi-ar
-OBJCOPY := $(DEVKITARM)/bin/arm-none-eabi-objcopy
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=/opt/devkitpro")
+endif
 
-CFLAGS   := -O2 -Wall -fdata-sections -ffunction-sections
-CFLAGS  += -march=armv6k -mtune=mpcore -mfloat-abi=hard
-INCLUDES := -I$(DEVKITPRO)/libctru/include -I$(DEVKITPRO)/citro2d/include
+TOPDIR ?= $(CURDIR)
+include $(DEVKITPRO)/3ds_rules
 
-LDFLAGS  := -specs=3dsx.specs -Wl,-Map,$(notdir $@).map
-LDFLAGS  += -L$(DEVKITPRO)/libctru/lib -lctru
-LDFLAGS  += -L$(DEVKITPRO)/citro2d/lib -lcitro2d
-LDFLAGS  += -lm
+#---------------------------------------------------------------------------------
+# configurable options
+#---------------------------------------------------------------------------------
+APP_ICON	:= $(TOPDIR)/misc/3ds/icon.png
+APP_TITLE 	:= ClassiCube
+APP_DESCRIPTION := Simple block building sandbox
+APP_AUTHOR 	:= UnknownShadow200
+TARGET 		:= ClassiCube-3ds
 
-SRC := main.c
-OBJ := $(SRC:.c=.o)
+#---------------------------------------------------------------------------------
+# TARGET is the name of the output
+# BUILD is the directory where object files & intermediate files will be placed
+# SOURCES is a list of directories containing source code
+# INCLUDES is a list of directories containing header files
+#---------------------------------------------------------------------------------
+BUILD		:=	build-3ds
+SOURCES		:= src misc/3ds third_party/bearssl/src 3ds
+INCLUDES	:=	third_party/bearssl/inc
 
-TARGET := GDWave3DS.3dsx
+CIA_BANNER_BIN	:= $(TOPDIR)/misc/3ds/banner.bin
+CIA_ICON_BIN	:= $(TOPDIR)/misc/3ds/icon.bin
+CIA_SPEC_RSF	:= $(TOPDIR)/misc/3ds/spec.rsf
 
-all: $(TARGET)
+#---------------------------------------------------------------------------------
+# options for code generation
+#---------------------------------------------------------------------------------
+ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
-$(TARGET): $(OBJ)
-	@echo "[Link] $@"
-	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET) $(LDFLAGS)
+CFLAGS	:=	-g -Wall -O2 -mword-relocations \
+			-ffunction-sections \
+			$(ARCH)
 
-%.o: %.c
-	@echo "[Compile] $<"
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+CFLAGS	+=	$(INCLUDE) -D__3DS__
 
-clean:
-	rm -f $(OBJ) $(TARGET) *.map
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
+
+ASFLAGS	:=	-g $(ARCH)
+LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+
+LIBS	:= -lctru -lm
+
+
+#---------------------------------------------------------------------------------
+# no real need to edit anything past this point unless you need to add additional
+# rules for different file extensions
+#---------------------------------------------------------------------------------
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+#---------------------------------------------------------------------------------
+
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export TOPDIR	:=	$(CURDIR)
+
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
+
+export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+PICAFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.v.pica)))
+
+export LD	:=	$(CC)
+
+export OFILES_SOURCES 	:=	$(CFILES:.c=.o) $(SFILES:.s=.o)
+
+export OFILES_BIN	:=	$(PICAFILES:.v.pica=.shbin.o)
+
+export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
+
+export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+			$(foreach dir,$(CTRULIB),-I$(dir)/include) \
+			-I$(CURDIR)/$(BUILD)
+
+export LIBPATHS	:=	$(foreach dir,$(CTRULIB),-L$(dir)/lib)
+
+export _3DSXFLAGS = --smdh=$(CURDIR)/$(TARGET).smdh
 
 .PHONY: all clean
+
+#---------------------------------------------------------------------------------
+all: $(BUILD)
+	$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/misc/3ds/Makefile
+
+$(BUILD):
+	mkdir -p $@
+
+#---------------------------------------------------------------------------------
+clean:
+	echo clean ...
+	rm -fr $(BUILD) $(TARGET).cia $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf
+
+#---------------------------------------------------------------------------------
+else
+
+#---------------------------------------------------------------------------------
+# main targets (when in build directory)
+#---------------------------------------------------------------------------------
+$(OUTPUT).3dsx	:	$(OUTPUT).elf $(OUTPUT).smdh
+
+$(OUTPUT).elf	:	$(OFILES)
+	$(LD) $(OFILES) -o $(OUTPUT).elf $(LDFLAGS) $(LIBPATHS) $(LIBS)
+
+#---------------------------------------------------------------------------------
+.PRECIOUS	:	%.shbin
+#---------------------------------------------------------------------------------
+
+%.shbin.o : %.v.pica
+	$(eval CUR_SRC	:= $<)
+	$(eval CUR_FILE := $(notdir $(CUR_SRC)))
+	$(eval CUR_BIN	:= $(CURDIR)/$(subst .v.pica,.shbin,$(CUR_FILE)))
+	picasso -o $(CUR_BIN) $(CUR_SRC)
+	bin2s $(CUR_BIN) | $(AS) -o $(CUR_BIN).o
+
+-include $(DEPSDIR)/*.d
+
+#---------------------------------------------------------------------------------------
+endif
+#---------------------------------------------------------------------------------------

@@ -1,32 +1,52 @@
-name: Build GDWave (3DS)
+name: Build GDWave (3DS .3dsx only)
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.ref }}-3ds
-  cancel-in-progress: true
 
 jobs:
   build-3DS:
-    timeout-minutes: 10
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     container:
       image: devkitpro/devkitarm:latest
+
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build .3dsx
+      - name: Prepare icon if missing (use assets/wave.png)
         run: |
-          cd 3ds
-          make
+          set -e
+          mkdir -p misc/3ds
+          if [ ! -f misc/3ds/icon.png ] && [ -f assets/wave.png ]; then
+            cp assets/wave.png misc/3ds/icon.png
+            echo "Copied assets/wave.png -> misc/3ds/icon.png"
+          else
+            echo "Icon present or assets/wave.png missing; skipping copy"
+          fi
 
-      - name: Upload GDWave .3dsx
+      - name: Show env + devkit listing (debug)
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "DEVKITARM=$DEVKITARM"
+          ls -la $DEVKITPRO || true
+          ls -la $DEVKITARM || true
+
+      - name: Build .3dsx (standalone make in 3ds/)
+        run: |
+          set -e
+          cd 3ds
+          make clean || true
+          make
+          ls -la
+
+      - name: Upload .3dsx artifact
         uses: actions/upload-artifact@v4
         with:
           name: GDWave-3dsx
-          path: 3ds/build/GDWave3DS.3dsx
+          path: 3ds/GDWave3DS.3dsx
